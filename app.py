@@ -1,10 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
-
+import os
+import json
 
 app=FastAPI()
 
@@ -29,7 +30,9 @@ def getdata(Userdata:Userdata):
     date=Userdata.date
     date = datetime.strptime(Userdata.date, "%Y-%m-%d").strftime("%d-%b-%Y")
     scopes=["https://www.googleapis.com/auth/spreadsheets"]
-    creds=Credentials.from_service_account_file("credentials.json",scopes=scopes)
+    service_account_info = json.loads(os.environ["GOOGLE_CREDENTIALS"])
+    creds = Credentials.from_service_account_info(service_account_info,scopes=scopes)
+
     client=gspread.authorize(creds)
 
     sheet_id="1SBj6p6g0U4iZ77r20hqkyflaTIVMEsGguq3ufjQRaHk"
@@ -40,7 +43,7 @@ def getdata(Userdata:Userdata):
     try:
         col=headers.index(name)+1
     except ValueError:
-        print("Employee not found")
+       raise HTTPException(status_code=404, detail="Employee not found")
     row=None
     for i,record in enumerate(values[1:],start=2):
         if record[0]==date:
@@ -48,9 +51,10 @@ def getdata(Userdata:Userdata):
             break
 
     if row is None:
-        print("No date found")
+       raise HTTPException(status_code=404, detail="Date not found")
     else:
-        sheet.update_cell(row,col,leave_type)    
+        sheet.update_cell(row,col,leave_type)
+        return {"message": "Data updated successfully"}
     # print(name," ",types," ",date," ",type(date))
     # print("2026-07-01"==date)
 
